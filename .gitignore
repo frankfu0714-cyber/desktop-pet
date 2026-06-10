@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# build output (installers are published to GitHub Releases, not committed)
+dist/
+
 # OS junk
 .DS_Store
 
