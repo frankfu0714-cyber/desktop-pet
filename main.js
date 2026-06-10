@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } = require('electron');
+const path = require('path');
 
 let win = null;
 let tray = null;
@@ -197,10 +198,18 @@ function setPet(pet) {
 }
 
 function createTray() {
-  tray = new Tray(nativeImage.createEmpty());
-  tray.setTitle('🐾');
+  if (process.platform === 'darwin') {
+    // macOS: blank icon + emoji title shows 🐾 in the menu bar
+    tray = new Tray(nativeImage.createEmpty());
+    tray.setTitle('🐾');
+  } else {
+    // Windows/Linux: use a real icon in the system tray
+    tray = new Tray(path.join(__dirname, 'tray.png'));
+  }
   tray.setToolTip('Desktop Pet');
   tray.setContextMenu(buildMenu());
+  // Windows: left-click should also open the menu
+  tray.on('click', () => { try { tray.popUpContextMenu(); } catch (e) {} });
 }
 
 function createWindow() {
