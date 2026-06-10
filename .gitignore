@@ -1,0 +1,8 @@
+# dependencies
+node_modules/
+
+# OS junk
+.DS_Store
+
+# logs
+npm-debug.log*

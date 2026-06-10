@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: transparent; overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  #stage { position: relative; width: 220px; height: 200px; cursor: grab; }
+  #stage:active { cursor: grabbing; }
+  svg { width: 220px; height: 200px; display: block; }
+
+  /* ---- facing ---- */
+  .flip { transform-box: fill-box; transform-origin: center; transition: transform .12s; }
+  .facing-left .flip { transform: scaleX(-1); }
+
+  .pet { transform-box: fill-box; transform-origin: bottom center; }
+
+  /* ---- idle ---- */
+  .state-idle .pet { animation: breathe 3.2s ease-in-out infinite; }
+  @keyframes breathe {
+    0%,100% { transform: translateY(0) scaleY(1); }
+    50%     { transform: translateY(-1px) scaleY(1.03); }
+  }
+
+  /* ---- walk ---- */
+  .state-walk .pet { animation: hop .42s ease-in-out infinite; }
+  @keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+  /* ---- sleep (curled loaf) ---- */
+  .state-sleep .pet { animation: snooze 4.6s ease-in-out infinite; }
+  @keyframes snooze {
+    0%,100% { transform: translateY(16px) scaleY(.70); }
+    50%     { transform: translateY(13px) scaleY(.75); }
+  }
+  .state-sleep .leg { opacity: 0; }
+
+  /* ---- eat ---- */
+  .state-eat .head { transform-box: fill-box; transform-origin: 28% 96%; animation: chew .5s ease-in-out infinite; }
+  @keyframes chew { 0%,100% { transform: rotate(20deg); } 50% { transform: rotate(27deg); } }
+
+  /* ---- legs (walk cycle) ---- */
+  .leg { transform-box: fill-box; transform-origin: 50% 0; }
+  .state-walk .leg.f1, .state-walk .leg.b2 { animation: legA .42s ease-in-out infinite; }
+  .state-walk .leg.f2, .state-walk .leg.b1 { animation: legB .42s ease-in-out infinite; }
+  @keyframes legA { 0%,100% { transform: rotate(-16deg); } 50% { transform: rotate(16deg); } }
+  @keyframes legB { 0%,100% { transform: rotate(16deg); } 50% { transform: rotate(-16deg); } }
+
+  /* ---- tail ---- */
+  .tail { transform-box: fill-box; transform-origin: 82% 88%; }
+  .state-idle .tail { animation: wag 1.5s ease-in-out infinite; }
+  .state-walk .tail { animation: wag .5s ease-in-out infinite; }
+  .state-sleep .tail, .state-eat .tail { animation: wag 3.4s ease-in-out infinite; }
+  @keyframes wag { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+
+  /* ---- ears perk on walk ---- */
+  .ear { transform-box: fill-box; transform-origin: bottom center; }
+  .state-walk .ear { animation: perk .42s ease-in-out infinite; }
+  @keyframes perk { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-5deg); } }
+
+  /* ---- blink ---- */
+  .eye-open { transform-box: fill-box; transform-origin: center; }
+  .state-idle .eye-open, .state-walk .eye-open, .state-eat .eye-open { animation: blink 4.2s infinite; }
+  @keyframes blink { 0%,92%,100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+  .eye-closed { display: none; }
+  .state-sleep .eye-open { display: none; }
+  .state-sleep .eye-closed { display: block; }
+
+  /* ---- lifted (scruff) — overrides everything ---- */
+  .lifted .pet { animation: dangleBody 1.4s ease-in-out infinite; transform-origin: top center; }
+  @keyframes dangleBody { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+  .lifted .leg { animation: dangle 1s ease-in-out infinite !important; transform-origin: 50% 0; }
+  @keyframes dangle { 0%,100% { transform: rotate(-12deg) translateY(7px); } 50% { transform: rotate(12deg) translateY(7px); } }
+  .lifted .tail { animation: dangleT 1.3s ease-in-out infinite !important; }
+  @keyframes dangleT { 0%,100% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
+
+  /* ---- image sprite mode ---- */
+  .sprite { width: 220px; height: 200px; object-fit: contain; object-position: center bottom; transform-box: border-box; }
+  .state-walk .sprite { animation: waddle .45s ease-in-out infinite; }
+  @keyframes waddle { 0%,100% { transform: translateY(0) rotate(-2.5deg); } 50% { transform: translateY(-6px) rotate(2.5deg); } }
+  .state-eat .sprite, .state-eat .sheet { animation: eatdip .6s ease-in-out infinite; transform-origin: 70% 100%; }
+  @keyframes eatdip { 0%,100% { transform: rotate(9deg) translateY(2px); } 50% { transform: rotate(13deg) translateY(5px); } }
+
+  /* ---- sprite-sheet mode (real frame animation) ---- */
+  .sheet {
+    display: block; margin: 0 auto;
+    width: 200px; height: 200px;
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    background-size: calc(var(--n) * 200px) 200px;
+  }
+  .sheet.cycling { animation: sheetcycle var(--dur) steps(var(--n)) infinite; }
+  @keyframes sheetcycle { from { background-position-x: 0; } to { background-position-x: calc(var(--n) * -200px); } }
+  /* play once and hold the LAST real frame (jump-none ends on frame n-1, not the blank n-th) */
+  .sheet.cycle-once { animation: sheetonce var(--dur) steps(var(--n), jump-none) 1 both; }
+  @keyframes sheetonce { from { background-position-x: 0; } to { background-position-x: calc((var(--n) - 1) * -200px); } }
+
+  /* ---- floating Zzz / heart ---- */
+  #zzz { position:absolute; top:72px; right:54px; font:700 24px/1 -apple-system,sans-serif; color:#7aa7d8; opacity:0; pointer-events:none; }
+  .state-sleep #zzz { animation: floatz 2.6s ease-in-out infinite; }
+  @keyframes floatz { 0% { opacity:0; transform:translateY(6px) scale(.7);} 40%{opacity:1;} 100%{opacity:0; transform:translateY(-22px) scale(1.1);} }
+  #heart { position:absolute; top:38px; left:55%; transform:translateX(-50%); font-size:22px; opacity:0; pointer-events:none; }
+  .happy #heart { animation: pop .7s ease-out 1; }
+  @keyframes pop { 0%{opacity:0; transform:translate(-50%,0) scale(.4);} 35%{opacity:1; transform:translate(-50%,-16px) scale(1.1);} 100%{opacity:0; transform:translate(-50%,-34px) scale(.9);} }
+</style>
+</head>
+<body>
+  <div id="stage" class="state-idle facing-right">
+    <div id="pethost"></div>
+    <div id="zzz">z</div>
+    <div id="heart">💗</div>
+  </div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+/* ============ ARTWORK (side profile, facing right) ============ */
+const PETS = {
+  // ---- chubby tuxedo cat ----
+  cat: `
+  <g class="flip"><g class="pet">
+    <ellipse class="shadow" cx="112" cy="184" rx="80" ry="11" fill="rgba(0,0,0,.16)"/>
+    <g class="tail"><path d="M54 132 q -40 6 -38 -30 q 1 -20 18 -16 q -12 5 -10 18 q 3 21 32 15 z" fill="#1f1f1f"/></g>
+    <g class="leg b1"><rect x="64" y="134" width="22" height="46" rx="11" fill="#1f1f1f"/><ellipse cx="75" cy="180" rx="14" ry="8" fill="#fafafa"/></g>
+    <g class="leg b2"><rect x="92" y="138" width="22" height="44" rx="11" fill="#2b2b2b"/><ellipse cx="103" cy="180" rx="14" ry="8" fill="#fafafa"/></g>
+    <ellipse cx="104" cy="110" rx="76" ry="54" fill="#1f1f1f"/>
+    <path d="M150 70 q 30 8 30 54 q 0 36 -42 42 q -34 -2 -40 -34 q 54 8 52 -62 z" fill="#fafafa"/>
+    <ellipse cx="150" cy="120" rx="40" ry="44" fill="#fafafa"/>
+    <g class="leg f1"><rect x="132" y="138" width="22" height="44" rx="11" fill="#fafafa" stroke="#eee"/><ellipse cx="143" cy="182" rx="14" ry="8" fill="#fff"/></g>
+    <g class="leg f2"><rect x="158" y="138" width="22" height="44" rx="11" fill="#fff" stroke="#eee"/><ellipse cx="169" cy="182" rx="14" ry="8" fill="#fff"/></g>
+    <g class="head">
+      <circle cx="168" cy="82" r="37" fill="#fafafa"/>
+      <path d="M134 80 q 4 -42 42 -36 q 28 4 28 30 q -18 -13 -36 -9 q -20 4 -34 15 z" fill="#1f1f1f"/>
+      <g class="ear"><path d="M142 56 l -6 -26 l 26 16 z" fill="#1f1f1f"/></g>
+      <g class="ear"><path d="M190 50 l 12 -22 l -20 11 z" fill="#1f1f1f"/><path d="M188 50 l 8 -14 l -12 8 z" fill="#e6a6ae"/></g>
+      <g class="eye-open">
+        <ellipse cx="157" cy="84" rx="6" ry="8" fill="#3a3a3a"/><circle cx="159" cy="81" r="2" fill="#fff"/>
+        <ellipse cx="182" cy="84" rx="6" ry="8" fill="#3a3a3a"/><circle cx="184" cy="81" r="2" fill="#fff"/>
+      </g>
+      <g class="eye-closed" stroke="#2f2f2f" stroke-width="2.4" fill="none" stroke-linecap="round"><path d="M151 86 q 6 5 12 0"/><path d="M176 86 q 6 5 12 0"/></g>
+      <path d="M178 96 l 9 0 l -4.5 5 z" fill="#e89aa2"/>
+      <path d="M182.5 101 q -4 6 -11 4 M182.5 101 q 4 6 11 4" stroke="#9a9a9a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <g stroke="#dcdcdc" stroke-width="1.3" stroke-linecap="round"><path d="M174 98 l 30 -7 M174 102 l 31 1 M174 106 l 29 9"/></g>
+    </g>
+  </g></g>`,
+
+  // ---- smiley Shiba ----
+  shiba: `
+  <g class="flip"><g class="pet">
+    <ellipse class="shadow" cx="112" cy="184" rx="78" ry="11" fill="rgba(0,0,0,.16)"/>
+    <g class="tail"><path d="M44 100 q -26 -36 14 -48 q 24 -7 26 16 q -13 -9 -22 4 q -9 13 7 24 q 11 8 -5 17 q -16 7 -22 -13 z" fill="#e0892f"/><path d="M48 72 q 8 -16 24 -12 q -11 3 -13 17 z" fill="#f7e3c7"/></g>
+    <g class="leg b1"><rect x="62" y="138" width="22" height="44" rx="11" fill="#e0892f"/><ellipse cx="73" cy="182" rx="13" ry="7" fill="#f0d6b4"/></g>
+    <g class="leg b2"><rect x="90" y="140" width="22" height="42" rx="11" fill="#cf7a26"/><ellipse cx="101" cy="182" rx="13" ry="7" fill="#f0d6b4"/></g>
+    <ellipse cx="104" cy="116" rx="72" ry="48" fill="#e0892f"/>
+    <path d="M150 92 q 26 8 24 44 q -2 28 -42 32 q -38 -4 -42 -30 q 54 4 60 -46 z" fill="#f7e3c7"/>
+    <g class="leg f1"><rect x="132" y="142" width="22" height="40" rx="11" fill="#f0d6b4"/><ellipse cx="143" cy="182" rx="13" ry="7" fill="#f7e3c7"/></g>
+    <g class="leg f2"><rect x="158" y="142" width="22" height="40" rx="11" fill="#f0d6b4"/><ellipse cx="169" cy="182" rx="13" ry="7" fill="#f7e3c7"/></g>
+    <g class="head">
+      <circle cx="168" cy="88" r="35" fill="#e0892f"/>
+      <path d="M150 92 q -3 32 24 32 q 28 0 25 -24 q -2 -11 -11 -13 q -19 -4 -38 5 z" fill="#f7e3c7"/>
+      <path d="M150 88 q -11 4 -7 15 q 9 0 13 -11 z" fill="#f7e3c7"/>
+      <g class="ear"><path d="M146 60 l -6 -28 l 28 17 z" fill="#e0892f"/><path d="M150 56 l -2 -17 l 13 11 z" fill="#cf7a26"/></g>
+      <g class="ear"><path d="M188 56 l 9 -26 l -26 15 z" fill="#e0892f"/><path d="M186 54 l 5 -16 l -15 10 z" fill="#cf7a26"/></g>
+      <g class="eye-open" stroke="#2b2018" stroke-width="3" fill="none" stroke-linecap="round"><path d="M151 84 q 6 -7 12 0"/><path d="M176 84 q 6 -7 12 0"/></g>
+      <g class="eye-closed" stroke="#2b2018" stroke-width="3" fill="none" stroke-linecap="round"><path d="M151 86 q 6 -6 12 0"/><path d="M176 86 q 6 -6 12 0"/></g>
+      <ellipse cx="187" cy="97" rx="6" ry="5" fill="#2b2018"/>
+      <path d="M178 103 q 9 17 24 6 q 2 -7 -3 -9 q -13 7 -21 3 z" fill="#7a2e2e"/>
+      <path d="M185 110 q 6 9 13 2 q 0 -7 -6 -7 q -5 0 -7 5 z" fill="#e8607a"/>
+    </g>
+  </g></g>`,
+
+  // ---- husky ----
+  husky: `
+  <g class="flip"><g class="pet">
+    <ellipse class="shadow" cx="112" cy="184" rx="80" ry="11" fill="rgba(0,0,0,.16)"/>
+    <g class="tail"><path d="M50 122 q -38 0 -40 -36 q -1 -18 16 -17 q -9 6 -7 19 q 3 23 33 19 z" fill="#7f868e"/><path d="M30 76 q 9 -9 18 -5 q -7 7 -7 16 z" fill="#f3f5f7"/></g>
+    <g class="leg b1"><rect x="62" y="138" width="22" height="44" rx="11" fill="#eef1f4"/><ellipse cx="73" cy="182" rx="13" ry="7" fill="#fff"/></g>
+    <g class="leg b2"><rect x="90" y="140" width="22" height="42" rx="11" fill="#e3e8ec"/><ellipse cx="101" cy="182" rx="13" ry="7" fill="#fff"/></g>
+    <ellipse cx="104" cy="116" rx="74" ry="50" fill="#f3f5f7"/>
+    <path d="M40 112 q 4 -42 64 -46 q 60 -4 64 38 q -32 -24 -64 -19 q -38 5 -64 27 z" fill="#7f868e"/>
+    <g class="leg f1"><rect x="132" y="142" width="22" height="40" rx="11" fill="#eef1f4"/><ellipse cx="143" cy="182" rx="13" ry="7" fill="#fff"/></g>
+    <g class="leg f2"><rect x="158" y="142" width="22" height="40" rx="11" fill="#fff"/><ellipse cx="169" cy="182" rx="13" ry="7" fill="#fff"/></g>
+    <g class="head">
+      <circle cx="168" cy="88" r="35" fill="#f3f5f7"/>
+      <path d="M138 84 q 4 -38 42 -32 q 24 4 26 26 q -19 -13 -38 -7 q -19 6 -30 13 z" fill="#7f868e"/>
+      <path d="M151 86 q 6 -11 15 -4 q -4 7 -13 9 z" fill="#5f666e"/>
+      <g class="ear"><path d="M146 60 l -6 -28 l 28 17 z" fill="#7f868e"/><path d="M150 56 l -2 -17 l 13 11 z" fill="#d7b9a6"/></g>
+      <g class="ear"><path d="M188 54 l 9 -26 l -26 15 z" fill="#7f868e"/><path d="M186 52 l 5 -16 l -15 10 z" fill="#d7b9a6"/></g>
+      <g class="eye-open">
+        <ellipse cx="157" cy="86" rx="5.5" ry="7" fill="#4aa3d6"/><circle cx="157" cy="86" r="2.4" fill="#16384a"/><circle cx="159" cy="83" r="1.4" fill="#fff"/>
+        <ellipse cx="180" cy="86" rx="5.5" ry="7" fill="#4aa3d6"/><circle cx="180" cy="86" r="2.4" fill="#16384a"/><circle cx="182" cy="83" r="1.4" fill="#fff"/>
+      </g>
+      <g class="eye-closed" stroke="#3a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"><path d="M151 88 q 6 5 12 0"/><path d="M174 88 q 6 5 12 0"/></g>
+      <ellipse cx="187" cy="97" rx="6" ry="5" fill="#2b2b2b"/>
+      <path d="M181 103 q 6 15 17 6 q 2 -8 -4 -10 z" fill="#e8607a"/>
+      <path d="M186 105 v 10" stroke="#c44f66" stroke-width="1.4"/>
+    </g>
+  </g></g>`,
+};
+
+function svgWrap(inner){ return `<svg viewBox="0 0 220 200" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`; }
+
+const stage = document.getElementById('stage');
+const host = document.getElementById('pethost');
+let currentPet = null;
+
+// Per-pet, per-state sprite sheets (each a horizontal frame strip).
+const SHEETS = {
+  cat: {
+    walk:  { file: 'images/cat_walk.png',  frames: 25, dur: 1.4 },
+    sleep: { file: 'images/cat_sleep.png', frames: 25, dur: 3.4 },
+    lift:  { file: 'images/cat_lift.png',  frames: 25, dur: 1.4 },
+    eat:   { file: 'images/cat_eat.png',   frames: 25, dur: 2.2 },
+    idle:  { file: 'images/cat_idle.png',  frames: 1,  dur: 3.0 },
+  },
+  shiba: {
+    walk:  { file: 'images/shiba_walk.png',  frames: 25, dur: 1.4 },
+    sleep: { file: 'images/shiba_sleep.png', frames: 25, dur: 3.4 },
+    eat:   { file: 'images/shiba_eat.png',   frames: 25, dur: 2.2 },
+    lift:  { file: 'images/shiba_lift.png',  frames: 15, dur: 0.8 },
+    idle:  { file: 'images/shiba_idle.png',  frames: 1,  dur: 3.0 },
+  },
+  husky: {
+    walk:  { file: 'images/husky_walk.png',  frames: 25, dur: 1.4 },
+    sleep: { file: 'images/husky_sleep.png', frames: 25, dur: 3.4 },
+    eat:   { file: 'images/husky_eat.png',   frames: 25, dur: 2.2 },
+    lift:  { file: 'images/husky_lift.png',  frames: 10, dur: 0.55 },
+    idle:  { file: 'images/husky_idle.png',  frames: 1,  dur: 3.0 },
+  },
+};
+
+let currentMode = 'idle';
+let lifted = false;
+
+function showSVG(pet){ if(currentPet===pet) host.innerHTML = svgWrap(PETS[pet]||PETS.cat); }
+
+function trySingle(pet){
+  const probe = new Image();
+  probe.onload = () => { if(currentPet===pet) host.innerHTML = `<div class="flip"><img class="pet sprite" src="images/${pet}.png" draggable="false"></div>`; };
+  probe.onerror = () => showSVG(pet);
+  probe.src = `images/${pet}.png`;
+}
+
+// Pick the right sheet for the current state and apply it to the .sheet element.
+function applyAnim(){
+  const el = host.querySelector('.sheet');
+  const cfg = SHEETS[currentPet];
+  if(!el || !cfg) return;
+  let a, play = 'none';
+  if(lifted && cfg.lift && cfg.lift._ok)                         { a = cfg.lift;  play = 'once'; }
+  else if(currentMode === 'sleep' && cfg.sleep && cfg.sleep._ok) { a = cfg.sleep; play = 'loop'; }
+  else if(currentMode === 'walk' && cfg.walk && cfg.walk._ok)    { a = cfg.walk;  play = 'loop'; }
+  else if(currentMode === 'eat'  && cfg.eat  && cfg.eat._ok)     { a = cfg.eat;   play = 'loop'; }
+  else if(cfg.idle && cfg.idle._ok)                             { a = cfg.idle;  play = (cfg.idle.frames > 1) ? 'loop' : 'none'; }
+  else { a = (cfg.walk && cfg.walk._ok) ? cfg.walk : cfg.sleep; play = 'none'; }
+  if(!a) return;
+  el.style.backgroundImage = `url('${a.file}')`;
+  el.style.setProperty('--n', a.frames);
+  el.style.setProperty('--dur', a.dur + 's');
+  el.classList.toggle('cycling', play === 'loop');
+  el.classList.toggle('cycle-once', play === 'once');
+}
+
+function render(pet){
+  if(pet===currentPet) return;
+  currentPet=pet;
+  const cfg = SHEETS[pet];
+  if(!cfg){ trySingle(pet); return; }
+  // Preload every defined animation so applyAnim knows which exist.
+  Object.values(cfg).forEach(a => {
+    if(a && a.file && a._ok === undefined){
+      const im = new Image();
+      im.onload = () => { a._ok = true; if(currentPet===pet) applyAnim(); };
+      im.onerror = () => { a._ok = false; };
+      im.src = a.file;
+    }
+  });
+  const base = cfg.walk || cfg.sleep;
+  const probe = new Image();
+  probe.onload = () => { if(currentPet!==pet) return; base._ok = true;
+    host.innerHTML = `<div class="flip"><div class="pet sheet"></div></div>`; applyAnim(); };
+  probe.onerror = () => trySingle(pet);
+  probe.src = base.file;
+}
+function setMode(mode){ currentMode=mode; stage.classList.remove('state-idle','state-walk','state-sleep','state-eat'); stage.classList.add('state-'+mode); applyAnim(); }
+function setFacing(f){ stage.classList.remove('facing-left','facing-right'); stage.classList.add('facing-'+f); }
+
+ipcRenderer.on('state', (_e,{mode,facing,pet}) => { render(pet); setMode(mode); setFacing(facing); });
+render('cat');
+
+/* ============ interaction ============ */
+let down=false, moved=0, lx=0, ly=0, lifting=false;
+
+stage.addEventListener('mousedown', (e)=>{ down=true; moved=0; lx=e.screenX; ly=e.screenY; ipcRenderer.send('drag-start'); });
+window.addEventListener('mousemove', (e)=>{
+  if(!down) return;
+  const dx=e.screenX-lx, dy=e.screenY-ly; lx=e.screenX; ly=e.screenY;
+  moved += Math.abs(dx)+Math.abs(dy);
+  if(moved>5 && !lifting){ lifting=true; lifted=true; stage.classList.add('lifted'); applyAnim(); }
+  ipcRenderer.send('drag-move', { x:e.screenX, y:e.screenY, lifted:lifting });
+});
+window.addEventListener('mouseup', ()=>{
+  if(!down) return;
+  down=false;
+  if(lifting){ lifting=false; lifted=false; stage.classList.remove('lifted'); applyAnim(); }
+  ipcRenderer.send('drag-end');
+  if(moved<5){ ipcRenderer.send('poke'); stage.classList.add('happy'); setTimeout(()=>stage.classList.remove('happy'),750); }
+});
+stage.addEventListener('contextmenu', (e)=>{ e.preventDefault(); ipcRenderer.send('context-menu'); });
+</script>
+</body>
+</html>

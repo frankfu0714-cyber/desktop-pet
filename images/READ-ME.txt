@@ -1,0 +1,17 @@
+Drop your pet pictures in THIS folder.
+
+Easiest: just drop your raw images here (any name, any format — PNG/JPG/etc.)
+and tell Claude. Claude will cut out the backgrounds and rename them to the
+final files the app needs:
+
+    images/cat.png      (black & white / tuxedo cat)
+    images/shiba.png    (Shiba)
+    images/husky.png    (Husky)
+
+These should be transparent PNGs (background removed). If you'd rather prepare
+them yourself, save them with those exact names.
+
+Best results: a SIDE-VIEW, FULL-BODY pet on a plain/white background.
+The app sizes them to ~220 x 200 and rests them on the ground.
+
+If a file is missing, the app falls back to the built-in drawing for that pet.

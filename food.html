@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; background:transparent; overflow:hidden; -webkit-user-select:none; user-select:none; }
+  #plate { width:100px; height:100px; cursor:grab; }
+  #plate:active { cursor:grabbing; }
+  svg { width:100px; height:100px; display:block; }
+</style>
+</head>
+<body>
+  <div id="plate">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="96" rx="36" ry="4" fill="rgba(0,0,0,.16)"/>
+      <!-- bowl (kept fully inside the 100px canvas so the bottom isn't clipped) -->
+      <path d="M12 78 q 38 18 76 0 l -6 13 q -32 11 -64 0 z" fill="#d24b4b"/>
+      <ellipse cx="50" cy="78" rx="38" ry="12" fill="#ef6b6b"/>
+      <ellipse cx="50" cy="76" rx="31" ry="9" fill="#a83838"/>
+      <!-- kibble -->
+      <circle cx="40" cy="75" r="5" fill="#c98a4b"/>
+      <circle cx="51" cy="72" r="5" fill="#b9743a"/>
+      <circle cx="61" cy="76" r="5" fill="#c98a4b"/>
+      <circle cx="46" cy="78" r="5" fill="#a86a34"/>
+      <circle cx="56" cy="78" r="4" fill="#b9743a"/>
+    </svg>
+  </div>
+<script>
+const { ipcRenderer } = require('electron');
+let down=false, lx=0, ly=0;
+const p = document.getElementById('plate');
+p.addEventListener('mousedown', (e)=>{ down=true; lx=e.screenX; ly=e.screenY; ipcRenderer.send('food-drag-start'); });
+window.addEventListener('mousemove', (e)=>{
+  if(!down) return;
+  const dx=e.screenX-lx, dy=e.screenY-ly; lx=e.screenX; ly=e.screenY;
+  ipcRenderer.send('food-drag-move', {dx,dy});
+});
+window.addEventListener('mouseup', ()=>{ if(!down) return; down=false; ipcRenderer.send('food-drag-end'); });
+</script>
+</body>
+</html>
