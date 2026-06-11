@@ -21,6 +21,9 @@ jobs:
       - name: Decode signing cert
         run: |
           echo "MAC_CSC_LINK length: ${#MAC_CSC_LINK}"
+          echo "APPLE_ID length: ${#APPLE_ID}"
+          echo "APPLE_TEAM_ID length: ${#APPLE_TEAM_ID}"
+          echo "APPLE_APP_SPECIFIC_PASSWORD length: ${#APPLE_APP_SPECIFIC_PASSWORD}"
           printf '%s' "$MAC_CSC_LINK" | tr -d '\n\r ' | base64 -d > "$RUNNER_TEMP/cert.p12"
           ls -la "$RUNNER_TEMP/cert.p12"
           file "$RUNNER_TEMP/cert.p12"
@@ -29,6 +32,9 @@ jobs:
         env:
           MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       - name: Build, sign, notarize & publish (macOS)
         run: npx electron-builder --mac --publish always
         env:
