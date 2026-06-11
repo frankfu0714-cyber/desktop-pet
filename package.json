@@ -29,9 +29,16 @@
       "images/*_idle.png"
     ],
     "mac": {
-      "target": "dmg",
+      "target": [
+        { "target": "dmg", "arch": "universal" }
+      ],
       "category": "public.app-category.entertainment",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": { "teamId": "${env.APPLE_TEAM_ID}" }
     },
     "win": {
       "target": "nsis",
