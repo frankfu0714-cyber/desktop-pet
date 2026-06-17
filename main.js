@@ -34,6 +34,23 @@ let eatStart = 0;
 
 function workArea() { return screen.getPrimaryDisplay().workArea; }
 
+// Pin a window above the macOS Dock and the Windows taskbar. The
+// 'screen-saver' level sits above both, but macOS resets the level on
+// some focus/visibility transitions and Windows can lose HWND_TOPMOST
+// when another topmost window appears — so we re-apply on 'show',
+// 'focus', and 'blur'.
+function pinAlwaysOnTop(w) {
+  if (!w || w.isDestroyed()) return;
+  w.setAlwaysOnTop(true, 'screen-saver');
+  w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+}
+function wirePinning(w) {
+  pinAlwaysOnTop(w);
+  w.on('show', () => pinAlwaysOnTop(w));
+  w.on('focus', () => pinAlwaysOnTop(w));
+  w.on('blur', () => pinAlwaysOnTop(w));
+}
+
 function clampX(x) {
   const wa = workArea();
   return Math.max(wa.x, Math.min(wa.x + wa.width - WIN_W, x));
@@ -139,8 +156,7 @@ function dropFood() {
     hasShadow: false, alwaysOnTop: true,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
-  foodWin.setAlwaysOnTop(true, 'screen-saver');
-  foodWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  wirePinning(foodWin);
   foodWin.loadFile('food.html');
   // macOS clamps a window's spawn position above the Dock; re-apply once it's
   // shown so it lands at the intended low (over-the-Dock) spot immediately.
@@ -219,8 +235,7 @@ function createWindow() {
     skipTaskbar: true, hasShadow: false, alwaysOnTop: true, focusable: true,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
-  win.setAlwaysOnTop(true, 'screen-saver');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  wirePinning(win);
   win.loadFile('index.html');
 
   petX = clampX(workArea().x + (workArea().width - WIN_W) / 2);
