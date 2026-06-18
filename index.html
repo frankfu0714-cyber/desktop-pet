@@ -229,6 +229,14 @@ const SHEETS = {
     lift:  { file: 'images/husky_lift.png',  frames: 10, dur: 0.55 },
     idle:  { file: 'images/husky_idle.png',  frames: 1,  dur: 3.0 },
   },
+  fortune: {
+    walk:  { file: 'images/fortune_walk.png',  frames: 25, dur: 1.4 },
+    sleep: { file: 'images/fortune_sleep.png', frames: 25, dur: 3.4 },
+    eat:   { file: 'images/fortune_eat.png',   frames: 25, dur: 2.2 },
+    lift:  { file: 'images/fortune_lift.png',  frames: 15, dur: 0.85 },
+    wave:  { file: 'images/fortune_wave.png',  frames: 25, dur: 1.4 },
+    idle:  { file: 'images/fortune_idle.png',  frames: 1,  dur: 3.0 },
+  },
 };
 
 let currentMode = 'idle';
@@ -253,6 +261,7 @@ function applyAnim(){
   else if(currentMode === 'sleep' && cfg.sleep && cfg.sleep._ok) { a = cfg.sleep; play = 'loop'; }
   else if(currentMode === 'walk' && cfg.walk && cfg.walk._ok)    { a = cfg.walk;  play = 'loop'; }
   else if(currentMode === 'eat'  && cfg.eat  && cfg.eat._ok)     { a = cfg.eat;   play = 'loop'; }
+  else if(currentMode === 'wave' && cfg.wave && cfg.wave._ok)    { a = cfg.wave;  play = 'loop'; }
   else if(cfg.idle && cfg.idle._ok)                             { a = cfg.idle;  play = (cfg.idle.frames > 1) ? 'loop' : 'none'; }
   else { a = (cfg.walk && cfg.walk._ok) ? cfg.walk : cfg.sleep; play = 'none'; }
   if(!a) return;
@@ -284,7 +293,7 @@ function render(pet){
   probe.onerror = () => trySingle(pet);
   probe.src = base.file;
 }
-function setMode(mode){ currentMode=mode; stage.classList.remove('state-idle','state-walk','state-sleep','state-eat'); stage.classList.add('state-'+mode); applyAnim(); }
+function setMode(mode){ currentMode=mode; stage.classList.remove('state-idle','state-walk','state-sleep','state-eat','state-wave'); stage.classList.add('state-'+mode); applyAnim(); }
 function setFacing(f){ stage.classList.remove('facing-left','facing-right'); stage.classList.add('facing-'+f); }
 
 ipcRenderer.on('state', (_e,{mode,facing,pet}) => { render(pet); setMode(mode); setFacing(facing); });
