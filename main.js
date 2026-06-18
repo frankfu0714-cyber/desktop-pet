@@ -17,8 +17,8 @@ const MOUTH = 184;          // x of the pet's mouth within the artwork (facing r
 const NECK_Y = 60;          // y of the pet's neck/scruff within the window (for carrying)
 
 // ---- pet state ----
-let currentPet = 'cat';     // 'cat' | 'shiba' | 'husky'
-let mode = 'idle';          // 'idle' | 'walk' | 'sleep' | 'eat'
+let currentPet = 'cat';     // 'cat' | 'shiba' | 'husky' | 'fortune'
+let mode = 'idle';          // 'idle' | 'walk' | 'sleep' | 'eat' | 'wave'
 let facing = 'right';       // 'left' | 'right'
 let petX = 0, petY = 0;
 let targetX = null;
@@ -31,6 +31,27 @@ let lastSent = '';
 let foodActive = false;
 let plateX = 0, plateY = 0;
 let eatStart = 0;
+
+// ---- forced sleep (Sleep 💤 menu item) ----
+// When true, the pet stays asleep regardless of the idle timer until the user
+// pokes, drags, drops food, or otherwise interacts with it.
+let forcedSleep = false;
+
+// ---- fortune cat wave ----
+// The maneki-neko has an extra `wave` state on top of the other pets'
+// repertoire. It fires randomly while wandering and once as a greeting when
+// food is dropped. waveEnd is the ms timestamp the wave runs until; 0 = no
+// wave in progress. nextWaveAt is the next randomized auto-trigger time.
+const WAVE_CYCLE_MS = 1400;            // matches fortune_wave anim dur
+const WAVE_IDLE_MIN_MS = 60 * 1000;    // earliest auto-wave after last one
+const WAVE_IDLE_MAX_MS = 90 * 1000;    // latest auto-wave
+const WAVE_CYCLES_MIN = 4;
+const WAVE_CYCLES_MAX = 6;
+let waveEnd = 0;
+let nextWaveAt = 0;
+function scheduleNextWave(now) {
+  nextWaveAt = now + WAVE_IDLE_MIN_MS + Math.random() * (WAVE_IDLE_MAX_MS - WAVE_IDLE_MIN_MS);
+}
 
 function workArea() { return screen.getPrimaryDisplay().workArea; }
 
@@ -78,12 +99,39 @@ function applyPosition() {
 
 function wake() {
   lastActivity = Date.now();
+  forcedSleep = false;
   if (mode === 'sleep') { mode = 'idle'; nextDecision = Date.now() + 700; }
+  if (mode === 'wave') { mode = 'idle'; waveEnd = 0; }
+}
+
+function forceSleep() {
+  if (foodActive) removeFood();
+  targetX = null;
+  forcedSleep = true;
+  mode = 'sleep';
+  sendState();
 }
 
 function tick() {
   if (!win || win.isDestroyed() || dragging) return;
+  // Forced sleep freezes the pet in the sleep pose until the user wakes it.
+  if (forcedSleep) { sendState(); return; }
   const now = Date.now();
+
+  // ----- fortune cat: wave overrides everything else while it's playing -----
+  if (mode === 'wave') {
+    if (now >= waveEnd) {
+      waveEnd = 0;
+      mode = 'idle';
+      nextDecision = now + 500;
+      lastActivity = now;
+      scheduleNextWave(now);
+    } else {
+      facing = 'right';
+      sendState();
+      return;
+    }
+  }
 
   // ----- feeding overrides normal behavior -----
   if (foodActive) {
@@ -120,6 +168,18 @@ function tick() {
       applyPosition();
     }
   } else if (mode === 'idle') {
+    // Fortune cat: occasionally pause to wave, the iconic maneki-neko gesture.
+    if (currentPet === 'fortune' && nextWaveAt && now >= nextWaveAt) {
+      const cycles = WAVE_CYCLES_MIN + Math.floor(Math.random() * (WAVE_CYCLES_MAX - WAVE_CYCLES_MIN + 1));
+      waveEnd = now + cycles * WAVE_CYCLE_MS;
+      nextWaveAt = 0;
+      mode = 'wave';
+      facing = 'right';
+      targetX = null;
+      lastActivity = now;
+      sendState();
+      return;
+    }
     if (now >= nextDecision) {
       if (Math.random() < 0.6) {
         targetX = clampX(workArea().x + Math.random() * (workArea().width - WIN_W));
@@ -168,8 +228,15 @@ function dropFood() {
   foodWin.webContents.once('did-finish-load', placeFood);
   foodWin.on('closed', () => { foodWin = null; foodActive = false; });
   foodActive = true;
-  mode = 'walk';
   wake();
+  // Fortune cat greets food with one full wave cycle before walking to the bowl.
+  if (currentPet === 'fortune') {
+    waveEnd = Date.now() + WAVE_CYCLE_MS;
+    mode = 'wave';
+    facing = 'right';
+  } else {
+    mode = 'walk';
+  }
   if (tray) tray.setContextMenu(buildMenu());
 }
 
@@ -193,12 +260,14 @@ function buildMenu() {
         { label: '🐱  Cat (black & white)', type: 'radio', checked: currentPet === 'cat', click: () => setPet('cat') },
         { label: '🐕  Shiba', type: 'radio', checked: currentPet === 'shiba', click: () => setPet('shiba') },
         { label: '🐺  Husky', type: 'radio', checked: currentPet === 'husky', click: () => setPet('husky') },
+        { label: '🐱  Fortune Cat (招財貓)', type: 'radio', checked: currentPet === 'fortune', click: () => setPet('fortune') },
       ],
     },
     { type: 'separator' },
     foodActive
       ? { label: 'Remove food', click: () => removeFood() }
       : { label: 'Drop food 🍖', click: () => dropFood() },
+    { label: 'Sleep 💤', click: () => forceSleep() },
     { label: 'Bring to center', click: () => centerPet() },
     { type: 'separator' },
     { label: 'Quit', role: 'quit' },
@@ -208,6 +277,11 @@ function buildMenu() {
 function setPet(pet) {
   currentPet = pet;
   lastSent = '';
+  // Stop any in-progress wave when leaving the fortune cat, and arm the
+  // auto-wave timer when entering it.
+  waveEnd = 0;
+  if (pet === 'fortune') scheduleNextWave(Date.now());
+  else nextWaveAt = 0;
   sendState();
   if (tray) tray.setContextMenu(buildMenu());
   wake();
